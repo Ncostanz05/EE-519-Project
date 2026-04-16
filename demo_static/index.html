@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Speaker Age Estimation — Live Demo</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<header>
+  <h1>Speaker Age Estimation</h1>
+  <p class="subtitle">EE-519 Project — 4 prediction pipelines running in parallel</p>
+</header>
+
+<main>
+  <section class="card">
+    <h2>Record your voice</h2>
+    <p class="hint">Speak for ~3 seconds. Your audio stays on the server only long enough to run predictions.</p>
+    <div class="controls">
+      <button id="recordBtn" class="primary">● Record</button>
+      <button id="stopBtn" disabled>■ Stop</button>
+      <span id="recStatus" class="status"></span>
+    </div>
+    <audio id="recPlayback" controls hidden></audio>
+  </section>
+
+  <section class="card">
+    <h2>Or pick a dataset sample</h2>
+    <div class="filters">
+      <label>Age
+        <select id="ageFilter">
+          <option value="">Any</option>
+          <option value="teens">Teens</option>
+          <option value="twenties">Twenties</option>
+          <option value="thirties">Thirties</option>
+          <option value="fourties">Forties</option>
+          <option value="fifties">Fifties</option>
+          <option value="sixties">Sixties</option>
+          <option value="seventies">Seventies</option>
+        </select>
+      </label>
+      <label>Gender
+        <select id="genderFilter">
+          <option value="">Any</option>
+          <option value="Male">Male</option>
+          <option value="Female">Female</option>
+        </select>
+      </label>
+      <button id="loadSamplesBtn">Load samples</button>
+      <span id="samplesStatus" class="status"></span>
+    </div>
+    <div id="sampleList" class="sample-list"></div>
+  </section>
+
+  <section id="resultsSection" class="card" hidden>
+    <h2>Predictions</h2>
+    <div id="audioMeta" class="meta"></div>
+    <div class="results-grid">
+      <div class="result" data-key="rf">
+        <h3>A) Handcrafted RF</h3>
+        <div class="prediction"></div>
+        <div class="bars"></div>
+      </div>
+      <div class="result" data-key="cnn">
+        <h3>B) CNN (mel-spectrogram)</h3>
+        <div class="prediction"></div>
+        <div class="bars"></div>
+      </div>
+      <div class="result" data-key="embeddings">
+        <h3>C) Wav2Vec2 → RF</h3>
+        <div class="prediction"></div>
+        <div class="bars"></div>
+      </div>
+      <div class="result" data-key="gender_conditioned">
+        <h3>D) Gender-conditioned Age</h3>
+        <div class="prediction"></div>
+        <div class="bars"></div>
+      </div>
+      <div class="result gender" data-key="gender">
+        <h3>Gender</h3>
+        <div class="prediction"></div>
+        <div class="bars"></div>
+      </div>
+    </div>
+    <div id="trueLabels" class="truth" hidden></div>
+  </section>
+</main>
+
+<script src="app.js"></script>
+</body>
+</html>

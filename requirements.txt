@@ -1,0 +1,21 @@
+# Core numerical libraries
+numpy==1.26.4
+pandas==2.2.2
+
+# Audio processing
+librosa==0.10.1
+soundfile==0.12.1
+praat-parselmouth==0.4.3
+
+# Machine learning
+scikit-learn==1.4.2
+
+# Visualization
+matplotlib==3.8.4
+
+# Dataset loading (Hugging Face Common Voice)
+datasets==2.19.1
+
+# Optional but often required by datasets/audio
+pyarrow==15.0.2
+tqdm==4.66.4

@@ -1,0 +1,21 @@
+# macOS
+.DS_Store
+
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.ipynb_checkpoints/
+
+# Datasets (not versioned — download separately)
+data/
+commonvoice-v24_en-AU/
+cv_au_subset/
+sps-corpus-1.0-2025-11-25-en/
+
+# Editor / OS
+.vscode/
+.idea/
+*.swp

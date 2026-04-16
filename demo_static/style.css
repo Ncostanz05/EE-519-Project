@@ -1,0 +1,164 @@
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: #0f1220;
+  color: #e6e8f0;
+  line-height: 1.5;
+}
+header {
+  padding: 2rem 1rem 1rem;
+  text-align: center;
+  border-bottom: 1px solid #22263a;
+}
+header h1 { margin: 0 0 0.25rem; font-size: 1.8rem; }
+.subtitle { margin: 0; color: #8a90ad; font-size: 0.95rem; }
+
+main {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 1.5rem 1rem 4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.card {
+  background: #181b2e;
+  border: 1px solid #22263a;
+  border-radius: 12px;
+  padding: 1.25rem;
+}
+.card h2 { margin: 0 0 0.75rem; font-size: 1.15rem; }
+.hint { color: #8a90ad; font-size: 0.9rem; margin: 0 0 0.75rem; }
+
+.controls { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+button {
+  background: #2a2f4a;
+  color: #e6e8f0;
+  border: 1px solid #363b5a;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.95rem;
+  transition: background 0.15s;
+}
+button:hover:not(:disabled) { background: #353a5c; }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+button.primary { background: #e5484d; border-color: #e5484d; }
+button.primary:hover:not(:disabled) { background: #ff5a5f; }
+button.primary.recording { animation: pulse 1.2s infinite; }
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(229,72,77,0.6); }
+  50% { box-shadow: 0 0 0 10px rgba(229,72,77,0); }
+}
+
+.status { color: #8a90ad; font-size: 0.9rem; }
+
+audio { display: block; margin-top: 0.75rem; width: 100%; }
+
+.filters {
+  display: flex;
+  gap: 0.75rem;
+  align-items: end;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+.filters label { display: flex; flex-direction: column; font-size: 0.85rem; color: #8a90ad; gap: 0.25rem; }
+select {
+  background: #22263a;
+  color: #e6e8f0;
+  border: 1px solid #363b5a;
+  padding: 0.4rem 0.6rem;
+  border-radius: 6px;
+  font-size: 0.95rem;
+}
+
+.sample-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 0.5rem;
+  max-height: 320px;
+  overflow-y: auto;
+}
+.sample {
+  background: #22263a;
+  border: 1px solid #2f3452;
+  border-radius: 8px;
+  padding: 0.6rem 0.75rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background 0.15s;
+}
+.sample:hover { background: #2a2f4a; }
+.sample.active { border-color: #7a86ff; background: #2a2f4a; }
+.sample .meta { color: #8a90ad; font-size: 0.8rem; margin-top: 0.15rem; }
+
+.meta { color: #8a90ad; font-size: 0.9rem; margin-bottom: 0.75rem; }
+.truth {
+  margin-top: 1rem;
+  padding: 0.75rem;
+  background: #22263a;
+  border-radius: 8px;
+  font-size: 0.95rem;
+}
+.truth strong { color: #9fe19f; }
+
+.results-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 0.75rem;
+}
+.result {
+  background: #22263a;
+  border: 1px solid #2f3452;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+}
+.result h3 { margin: 0 0 0.5rem; font-size: 1rem; color: #a8b0d4; }
+.result.gender h3 { color: #c8a8ff; }
+.result .prediction {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: 0.6rem;
+}
+.result .prediction.empty { color: #6b7090; font-weight: 400; font-size: 1rem; }
+
+.bars { display: flex; flex-direction: column; gap: 0.25rem; }
+.bar-row { display: grid; grid-template-columns: 80px 1fr 44px; gap: 0.5rem; align-items: center; font-size: 0.8rem; }
+.bar-row .label { color: #8a90ad; }
+.bar-row .track {
+  height: 8px;
+  background: #181b2e;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.bar-row .fill {
+  height: 100%;
+  background: linear-gradient(90deg, #4c6ef5, #7a86ff);
+  transition: width 0.3s;
+}
+.bar-row.top .fill { background: linear-gradient(90deg, #22c55e, #86efac); }
+.bar-row .pct { color: #a8b0d4; text-align: right; font-variant-numeric: tabular-nums; }
+
+.spinner {
+  display: inline-block;
+  width: 14px; height: 14px;
+  border: 2px solid #4c6ef5;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin-right: 0.35rem;
+  vertical-align: -2px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.error {
+  background: #3a1f24;
+  border: 1px solid #e5484d;
+  color: #ffb4b7;
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  margin-top: 0.5rem;
+  font-size: 0.9rem;
+}
