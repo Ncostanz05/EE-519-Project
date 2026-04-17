@@ -15,7 +15,7 @@ header h1 { margin: 0 0 0.25rem; font-size: 1.8rem; }
 .subtitle { margin: 0; color: #8a90ad; font-size: 0.95rem; }
 
 main {
-  max-width: 960px;
+  max-width: 980px;
   margin: 0 auto;
   padding: 1.5rem 1rem 4rem;
   display: flex;
@@ -57,29 +57,22 @@ button.primary.recording { animation: pulse 1.2s infinite; }
 
 audio { display: block; margin-top: 0.75rem; width: 100%; }
 
-.filters {
+.samples-header {
   display: flex;
+  justify-content: space-between;
+  align-items: baseline;
   gap: 0.75rem;
-  align-items: end;
-  flex-wrap: wrap;
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.35rem;
 }
-.filters label { display: flex; flex-direction: column; font-size: 0.85rem; color: #8a90ad; gap: 0.25rem; }
-select {
-  background: #22263a;
-  color: #e6e8f0;
-  border: 1px solid #363b5a;
-  padding: 0.4rem 0.6rem;
-  border-radius: 6px;
-  font-size: 0.95rem;
-}
+.samples-header h2 { margin: 0; }
 
 .sample-list {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   gap: 0.5rem;
-  max-height: 320px;
+  max-height: 480px;
   overflow-y: auto;
+  margin-top: 0.5rem;
 }
 .sample {
   background: #22263a;
@@ -104,9 +97,103 @@ select {
 }
 .truth strong { color: #9fe19f; }
 
+/* ── Pipeline E flagship panel ────────────────────────────────────── */
+.flagship-panel {
+  background: linear-gradient(135deg, #1a1f3a 0%, #1e2040 60%, #1a2035 100%);
+  border: 1.5px solid #4c6ef5;
+  border-radius: 12px;
+  padding: 1rem 1.25rem 1.25rem;
+  margin-bottom: 1rem;
+  box-shadow: 0 0 24px rgba(76, 110, 245, 0.12);
+}
+.flagship-header {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.9rem;
+  flex-wrap: wrap;
+}
+.flagship-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #a8b8ff;
+  letter-spacing: 0.02em;
+}
+.flagship-prediction {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #ffffff;
+  margin-bottom: 0.25rem;
+}
+.flagship-prediction.empty { font-size: 1rem; color: #6b7090; font-weight: 400; }
+.flagship-sub {
+  font-size: 0.88rem;
+  color: #8a90ad;
+  margin-bottom: 0.75rem;
+}
+.flagship-body { display: grid; grid-template-columns: auto 1fr; gap: 1rem; align-items: start; }
+@media (max-width: 600px) { .flagship-body { grid-template-columns: 1fr; } }
+
+/* Top-3 table */
+.top3-table { min-width: 180px; }
+.top3-row {
+  display: grid;
+  grid-template-columns: 24px 1fr 48px;
+  gap: 0.4rem;
+  align-items: center;
+  font-size: 0.85rem;
+  padding: 0.2rem 0;
+  border-bottom: 1px solid #22263a;
+}
+.top3-row:last-child { border-bottom: none; }
+.top3-rank { color: #6b7090; font-size: 0.78rem; }
+.top3-row.rank-1 .top3-label { color: #ffffff; font-weight: 600; }
+.top3-row.rank-1 .top3-prob { color: #86efac; font-weight: 600; }
+.top3-label { color: #c8cfee; }
+.top3-prob { text-align: right; color: #8a90ad; font-variant-numeric: tabular-nums; }
+
+/* Uncertainty badge */
+.uncertainty-badge {
+  display: inline-block;
+  padding: 0.2rem 0.55rem;
+  border-radius: 20px;
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+.uncertainty-badge.low  { background: #14532d; color: #86efac; border: 1px solid #22c55e; }
+.uncertainty-badge.mid  { background: #422006; color: #fde68a; border: 1px solid #f59e0b; }
+.uncertainty-badge.high { background: #450a0a; color: #fca5a5; border: 1px solid #ef4444; }
+
+/* Analysis button */
+.analysis-btn {
+  margin-left: auto;
+  font-size: 0.82rem;
+  padding: 0.3rem 0.75rem;
+  background: #1e2a4a;
+  border-color: #4c6ef5;
+  color: #a8b8ff;
+}
+.analysis-btn:hover:not(:disabled) { background: #253470; }
+
+/* Analysis panel */
+.analysis-panel {
+  margin-top: 1rem;
+  border-top: 1px solid #22263a;
+  padding-top: 0.9rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.analysis-section { display: flex; flex-direction: column; gap: 0.4rem; }
+.analysis-label { font-size: 0.8rem; color: #8a90ad; text-transform: uppercase; letter-spacing: 0.06em; }
+.saliency-canvas { width: 100%; border-radius: 6px; display: block; }
+.saliency-legend { font-size: 0.78rem; color: #8a90ad; }
+.uncertainty-value { font-size: 0.95rem; color: #e6e8f0; }
+
+/* ── Baseline results grid ────────────────────────────────────────── */
 .results-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 0.75rem;
 }
 .result {

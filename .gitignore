@@ -15,6 +15,11 @@ commonvoice-v24_en-AU/
 cv_au_subset/
 sps-corpus-1.0-2025-11-25-en/
 
+# Large dataset archives
+*.tar
+*.tar.gz
+*.tar.bz2
+
 # Editor / OS
 .vscode/
 .idea/

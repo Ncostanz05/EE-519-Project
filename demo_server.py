@@ -1,10 +1,11 @@
 """
 Age Prediction Live Demo Server — Enhanced
-Runs 4 prediction pipelines:
+Runs 5 prediction pipelines:
   A) Random Forest on handcrafted features (MFCCs, pitch, formants, energy)
   B) CNN on mel-spectrograms
   C) Wav2Vec2 embeddings → RF age classifier
   D) Gender-aware: Wav2Vec2 → gender prediction → gender-conditioned age RF
+  E) WavLM-large multi-task (flagship): soft gender MoE, LDL loss, LoRA, calibration
 """
 
 import os, sys, tempfile, warnings
@@ -103,6 +104,24 @@ if os.path.exists(male_path):
 if os.path.exists(female_path):
     AGE_MODEL_FEMALE = joblib.load(female_path)
     print("  ✓ [D] Female age model loaded")
+
+# ── E) Pipeline E: WavLM-large multi-task ──────────────────────────
+PIPELINE_E = None
+_PE_CHECKPOINT_CANDIDATES = [
+    os.path.join(PROJECT_DIR, "pipeline_e_checkpoints", "seed_0", "lora"),
+    os.path.join(PROJECT_DIR, "pipeline_e_checkpoints", "seed_0", "frozen"),
+]
+for _ckpt_dir in _PE_CHECKPOINT_CANDIDATES:
+    if os.path.exists(os.path.join(_ckpt_dir, "best_model.pt")):
+        try:
+            from pipeline_e.inference import PipelineE
+            PIPELINE_E = PipelineE(_ckpt_dir, device=DEVICE)
+            print(f"  ✓ [E] Pipeline E loaded from {_ckpt_dir}")
+        except Exception as _e:
+            print(f"  ✗ [E] Could not load Pipeline E: {_e}")
+        break
+if PIPELINE_E is None:
+    print("  ✗ [E] Pipeline E checkpoint not found (run train_pipeline_e.py first)")
 
 # ── Load Wav2Vec2 if any embedding-based model exists ───────────────
 if EMB_AGE_MODEL is not None or GENDER_MODEL is not None:
@@ -258,6 +277,23 @@ def run_all_predictions(y, sr):
             "probabilities": probs,
         }
 
+    pe_result = None
+    if PIPELINE_E is not None:
+        try:
+            pe_out = PIPELINE_E.predict(y, sr=sr)
+            pe_result = {
+                "predicted_class": pe_out["age_pred"],
+                "predicted_label": pe_out["age_label"],
+                "probabilities": pe_out["age_proba"],
+                "top3": pe_out["top3_ages"],
+                "gender_pred": pe_out["gender_pred"],
+                "gender_label": pe_out["gender_label"],
+                "gender_proba": pe_out["gender_proba"],
+                "uncertainty": pe_out["uncertainty"],
+            }
+        except Exception as _e:
+            pe_result = {"error": str(_e)}
+
     return {
         "age_labels": AGE_LABELS,
         "gender_labels": GENDER_LABELS,
@@ -266,6 +302,7 @@ def run_all_predictions(y, sr):
         "embeddings": make_result(emb_pred, emb_probs),
         "gender": make_result(gender_pred, gender_probs, GENDER_LABELS),
         "gender_conditioned": make_result(gc_pred, gc_probs),
+        "pipeline_e": pe_result,
         "audio_duration_sec": round(len(y) / sr, 2),
     }
 
@@ -275,7 +312,7 @@ def run_all_predictions(y, sr):
 # ══════════════════════════════════════════════════════════════════════
 
 DATASET_DF = None
-AUDIO_DIR = os.path.join(PROJECT_DIR, "cv_au_subset", "audio")
+AUDIO_DIR = os.path.join(PROJECT_DIR, "commonvoice-v24_en-AU", "audio_files")
 
 def _load_dataset_df():
     global DATASET_DF
@@ -288,6 +325,11 @@ def _load_dataset_df():
         "fifties": 4, "sixties": 5, "seventies": 6,
     }
     GENDER_MAP_INV = {"male_masculine": "Male", "female_feminine": "Female"}
+
+    if not os.path.exists(metadata_path):
+        print(f"  ⚠  Dataset metadata not found at {metadata_path} — sample browser disabled.")
+        DATASET_DF = pd.DataFrame(columns=["path", "age", "gender", "age_label", "age_display", "gender_display"])
+        return DATASET_DF
 
     df = pd.read_csv(metadata_path, engine="python")
     df = df[df["age"].notna() & df["age"].isin(AGE_MAP_INV.keys())]
@@ -321,7 +363,7 @@ def api_samples():
     df = _load_dataset_df()
     age_filter = request.args.get("age", None)       # e.g. "twenties"
     gender_filter = request.args.get("gender", None)  # e.g. "Male"
-    count = min(int(request.args.get("count", 10)), 50)
+    count = min(int(request.args.get("count", 1000)), 1000)
 
     subset = df.copy()
     if age_filter:
@@ -372,7 +414,7 @@ def predict():
     os.unlink(tmp_path)
 
     rms = np.sqrt(np.mean(y**2))
-    if rms < 0.005:
+    if rms < 0.001:
         return jsonify({"error": "Audio too quiet – please speak louder or closer to the mic."}), 400
 
     result = run_all_predictions(y, sr)
@@ -399,6 +441,97 @@ def predict_file():
 
     result = run_all_predictions(y, sr)
     return jsonify(result)
+
+
+@app.route("/api/analyze", methods=["POST"])
+def analyze():
+    """
+    Deep analysis for Pipeline E: gradient saliency + embedding.
+    Returns saliency (one value per 320-sample frame), embedding (1024 floats),
+    age_proba (7 floats), uncertainty (float).
+    """
+    if PIPELINE_E is None:
+        return jsonify({"error": "Pipeline E not loaded"}), 503
+
+    if "audio" not in request.files:
+        return jsonify({"error": "No audio file"}), 400
+
+    audio_file = request.files["audio"]
+    with tempfile.NamedTemporaryFile(suffix=".webm", delete=False) as tmp:
+        tmp_path = tmp.name
+        audio_file.save(tmp_path)
+
+    try:
+        y, sr = librosa.load(tmp_path, sr=16000, mono=True)
+    except Exception as e:
+        os.unlink(tmp_path)
+        return jsonify({"error": f"Could not read audio: {e}"}), 400
+    os.unlink(tmp_path)
+
+    try:
+        import torch
+        from shared.constants import MAX_SAMPLES, TARGET_SR
+
+        # Prep waveform tensor
+        if len(y) >= MAX_SAMPLES:
+            start = (len(y) - MAX_SAMPLES) // 2
+            y_crop = y[start: start + MAX_SAMPLES]
+        else:
+            y_crop = np.pad(y, (0, MAX_SAMPLES - len(y))).astype(np.float32)
+        y_crop = y_crop.astype(np.float32)
+
+        encoded = PIPELINE_E.feature_extractor(
+            [y_crop], sampling_rate=TARGET_SR, return_tensors="pt",
+            padding="max_length", max_length=MAX_SAMPLES, truncation=True,
+        )
+        input_values = encoded.input_values.to(DEVICE).requires_grad_(True)
+
+        PIPELINE_E.model.eval()
+        out = PIPELINE_E.model(input_values)
+        age_logits = out["age_logits"]
+        top_class = age_logits.argmax(dim=-1).item()
+        score = age_logits[0, top_class]
+        score.backward()
+
+        # Pool gradient per 320-sample (20ms) frame for visualization
+        grad = input_values.grad[0].abs().cpu().numpy()   # (T,)
+        frame_size = 320
+        n_frames = len(grad) // frame_size
+        saliency = [
+            float(grad[i * frame_size: (i + 1) * frame_size].mean())
+            for i in range(n_frames)
+        ]
+        # Normalize to [0, 1]
+        s_arr = np.array(saliency)
+        if s_arr.max() > 0:
+            s_arr = s_arr / s_arr.max()
+        saliency = s_arr.tolist()
+
+        with torch.no_grad():
+            out2 = PIPELINE_E.model(encoded.input_values.to(DEVICE))
+            if PIPELINE_E.calibrator is not None:
+                proba = PIPELINE_E.calibrator(out2["age_logits"])[0].cpu().float().tolist()
+            else:
+                proba = torch.softmax(out2["age_logits"][0], dim=-1).cpu().float().tolist()
+            embedding = out2["embedding"][0].cpu().float().tolist()
+
+        # MC dropout uncertainty
+        try:
+            mc = PIPELINE_E.model.predict_with_mc_dropout(
+                encoded.input_values.to(DEVICE), n_samples=10
+            )
+            uncertainty = float(mc["uncertainty"][0].item())
+        except Exception:
+            uncertainty = None
+
+        return jsonify({
+            "saliency": saliency,
+            "embedding_norm": float(np.linalg.norm(embedding)),
+            "age_proba": proba,
+            "uncertainty": uncertainty,
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 if __name__ == "__main__":

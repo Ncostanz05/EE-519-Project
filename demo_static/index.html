@@ -9,13 +9,13 @@
 <body>
 <header>
   <h1>Speaker Age Estimation</h1>
-  <p class="subtitle">EE-519 Project — 4 prediction pipelines running in parallel</p>
+  <p class="subtitle">EE-519 Project — 5 prediction pipelines (A–D: baselines · E: flagship WavLM)</p>
 </header>
 
 <main>
   <section class="card">
     <h2>Record your voice</h2>
-    <p class="hint">Speak for ~3 seconds. Your audio stays on the server only long enough to run predictions.</p>
+    <p class="hint">Speak for ~3 seconds to predict your age group across all pipelines.</p>
     <div class="controls">
       <button id="recordBtn" class="primary">● Record</button>
       <button id="stopBtn" disabled>■ Stop</button>
@@ -25,36 +25,45 @@
   </section>
 
   <section class="card">
-    <h2>Or pick a dataset sample</h2>
-    <div class="filters">
-      <label>Age
-        <select id="ageFilter">
-          <option value="">Any</option>
-          <option value="teens">Teens</option>
-          <option value="twenties">Twenties</option>
-          <option value="thirties">Thirties</option>
-          <option value="fourties">Forties</option>
-          <option value="fifties">Fifties</option>
-          <option value="sixties">Sixties</option>
-          <option value="seventies">Seventies</option>
-        </select>
-      </label>
-      <label>Gender
-        <select id="genderFilter">
-          <option value="">Any</option>
-          <option value="Male">Male</option>
-          <option value="Female">Female</option>
-        </select>
-      </label>
-      <button id="loadSamplesBtn">Load samples</button>
+    <div class="samples-header">
+      <h2>Or test a dataset sample</h2>
       <span id="samplesStatus" class="status"></span>
     </div>
+    <p class="hint">Click any sample to run all prediction pipelines on it.</p>
     <div id="sampleList" class="sample-list"></div>
   </section>
 
   <section id="resultsSection" class="card" hidden>
     <h2>Predictions</h2>
     <div id="audioMeta" class="meta"></div>
+
+    <!-- Pipeline E flagship panel -->
+    <div id="pipelineEPanel" class="flagship-panel" hidden>
+      <div class="flagship-header">
+        <span class="flagship-title">E · WavLM-large (Flagship)</span>
+        <span id="uncertaintyBadge" class="uncertainty-badge" hidden></span>
+        <button id="analysisToggle" class="analysis-btn" hidden>⚡ Analysis</button>
+      </div>
+      <div class="flagship-body">
+        <div class="flagship-prediction" id="ePrediction">—</div>
+        <div class="flagship-sub" id="eGenderSub"></div>
+        <div class="top3-table" id="eTop3"></div>
+        <div class="bars" id="eBars"></div>
+      </div>
+      <!-- Analysis mode (hidden until toggled) -->
+      <div id="analysisPanel" class="analysis-panel" hidden>
+        <div class="analysis-section">
+          <div class="analysis-label">Gradient Saliency (where the model is listening)</div>
+          <canvas id="saliencyCanvas" class="saliency-canvas"></canvas>
+          <div class="saliency-legend"><span style="color:#ef4444">■</span> high  <span style="color:#22c55e">■</span> low</div>
+        </div>
+        <div class="analysis-section" id="analysisUncertainty" hidden>
+          <div class="analysis-label">MC Dropout Uncertainty</div>
+          <div id="uncertaintyValue" class="uncertainty-value"></div>
+        </div>
+      </div>
+    </div>
+
     <div class="results-grid">
       <div class="result" data-key="rf">
         <h3>A) Handcrafted RF</h3>

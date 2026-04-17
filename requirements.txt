@@ -19,3 +19,21 @@ datasets==2.19.1
 # Optional but often required by datasets/audio
 pyarrow==15.0.2
 tqdm==4.66.4
+
+# Model persistence
+joblib==1.4.2
+
+# Deep learning (CNN + Wav2Vec2 embeddings)
+torch==2.2.2
+torchaudio==2.2.2
+transformers==4.40.2
+
+# Demo web server
+flask==3.0.3
+flask-cors==4.0.1
+
+# Pipeline E extras
+peft==0.10.0
+umap-learn==0.5.6
+scipy==1.13.0
+accelerate==0.29.3
