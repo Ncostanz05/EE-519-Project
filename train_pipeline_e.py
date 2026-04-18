@@ -203,13 +203,16 @@ def build_loaders(config: PipelineEConfig, seed: int):
     train_ds = PipelineEDataset(train_df, augment=augment, training=True)
     val_ds = PipelineEDataset(val_df, augment=augment, training=False)
 
+    num_workers = int(os.environ.get("PIPELINE_E_NUM_WORKERS", "16"))
     train_loader = DataLoader(
         train_ds, batch_size=config.batch_size, sampler=sampler,
-        collate_fn=collate, num_workers=4, pin_memory=True,
+        collate_fn=collate, num_workers=num_workers, pin_memory=True,
+        persistent_workers=True, prefetch_factor=4,
     )
     val_loader = DataLoader(
         val_ds, batch_size=config.batch_size, shuffle=False,
-        collate_fn=collate, num_workers=4, pin_memory=True,
+        collate_fn=collate, num_workers=num_workers, pin_memory=True,
+        persistent_workers=True, prefetch_factor=4,
     )
     return train_loader, val_loader
 
