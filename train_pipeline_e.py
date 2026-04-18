@@ -219,7 +219,7 @@ def run_training(args, seed: int) -> dict:
     device = get_device()
     print(f"\n=== Seed {seed} | device={device} ===")
 
-    config = PipelineEConfig(
+    config_kwargs = dict(
         backbone_name=args.backbone,
         age_head_type=args.age_head,
         use_gender_moe=not args.no_moe,
@@ -230,6 +230,11 @@ def run_training(args, seed: int) -> dict:
         seed=seed,
         output_dir=args.output_dir,
     )
+    if args.cv_csv is not None:
+        config_kwargs["cv_csv"] = args.cv_csv
+    if args.cv_audio_dir is not None:
+        config_kwargs["cv_audio_dir"] = args.cv_audio_dir
+    config = PipelineEConfig(**config_kwargs)
     if "base" in config.backbone_name:
         config.embedding_dim = 768
 
@@ -283,6 +288,8 @@ def main():
     parser.add_argument("--no-moe", action="store_true")
     parser.add_argument("--no-calibrate", action="store_true")
     parser.add_argument("--no-augment", action="store_true")
+    parser.add_argument("--cv-csv", default=None, dest="cv_csv")
+    parser.add_argument("--cv-audio-dir", default=None, dest="cv_audio_dir")
     args = parser.parse_args()
 
     seeds = args.seeds if args.seeds is not None else [args.seed]
