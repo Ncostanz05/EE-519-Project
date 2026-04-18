@@ -1,3 +1,5 @@
+import os
+
 import numpy as np
 import pandas as pd
 import torch
@@ -7,6 +9,21 @@ import librosa
 
 from pipeline_e.augmentation import AugmentationPipeline
 from shared.constants import TARGET_SR, MAX_SAMPLES
+
+
+def _load_audio_cached(audio_path: str) -> np.ndarray:
+    """Load audio, preferring a .npy cache next to the file if present."""
+    npy_path = audio_path + ".npy"
+    if os.path.exists(npy_path):
+        try:
+            return np.load(npy_path)
+        except Exception:
+            pass
+    try:
+        y, _ = librosa.load(audio_path, sr=TARGET_SR, mono=True)
+        return y.astype(np.float32)
+    except Exception:
+        return np.zeros(MAX_SAMPLES, dtype=np.float32)
 
 
 class PipelineEDataset(Dataset):
@@ -32,10 +49,7 @@ class PipelineEDataset(Dataset):
 
     def __getitem__(self, idx: int) -> dict:
         row = self.df.iloc[idx]
-        try:
-            y, _ = librosa.load(row["audio_path"], sr=TARGET_SR, mono=True)
-        except Exception:
-            y = np.zeros(MAX_SAMPLES, dtype=np.float32)
+        y = _load_audio_cached(row["audio_path"])
 
         if self.augment is not None:
             y = self.augment(y, training=self.training)
