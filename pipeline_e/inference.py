@@ -30,7 +30,8 @@ class PipelineE:
                 device = torch.device("cpu")
         self.device = torch.device(device) if isinstance(device, str) else device
 
-        ckpt = torch.load(os.path.join(checkpoint_dir, "best_model.pt"), map_location=self.device)
+        ckpt = torch.load(os.path.join(checkpoint_dir, "best_model.pt"),
+                          map_location=self.device, weights_only=False)
         self.config: PipelineEConfig = ckpt["config"]
 
         self.model = WavLMMultiTaskModel(self.config).to(self.device)
@@ -43,7 +44,9 @@ class PipelineE:
         self.calibrator = None
         if os.path.exists(cal_path):
             self.calibrator = TemperatureScaler()
-            self.calibrator.load_state_dict(torch.load(cal_path, map_location=self.device))
+            self.calibrator.load_state_dict(
+                torch.load(cal_path, map_location=self.device, weights_only=False)
+            )
             self.calibrator.to(self.device).eval()
 
     # ── Internal helpers ───────────────────────────────────────────────────────
