@@ -20,6 +20,9 @@ sps-corpus-1.0-2025-11-25-en/
 *.tar.gz
 *.tar.bz2
 
+# Pipeline E model checkpoints (1.2GB, stored on Google Drive)
+pipeline_e_checkpoints/
+
 # Editor / OS
 .vscode/
 .idea/
