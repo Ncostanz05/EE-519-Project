@@ -22,9 +22,10 @@ class PipelineE:
         device: torch.device | str | None = None,
     ):
         if device is None:
-            if torch.backends.mps.is_available():
-                device = torch.device("mps")
-            elif torch.cuda.is_available():
+            # Prefer CUDA. Skip MPS: WavLM-large produces degenerate outputs
+            # on the Apple Metal backend (collapses to majority class).
+            # CPU is fine for demo-rate inference (~200–500 ms/clip on M-series).
+            if torch.cuda.is_available():
                 device = torch.device("cuda")
             else:
                 device = torch.device("cpu")

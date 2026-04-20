@@ -115,8 +115,11 @@ for _ckpt_dir in _PE_CHECKPOINT_CANDIDATES:
     if os.path.exists(os.path.join(_ckpt_dir, "best_model.pt")):
         try:
             from pipeline_e.inference import PipelineE
-            PIPELINE_E = PipelineE(_ckpt_dir, device=DEVICE)
-            print(f"  ✓ [E] Pipeline E loaded from {_ckpt_dir}")
+            # Don't pass DEVICE: Pipeline E auto-selects a safe device
+            # (CUDA if present, else CPU — MPS is skipped because WavLM-large
+            # collapses to majority class on the Apple Metal backend).
+            PIPELINE_E = PipelineE(_ckpt_dir)
+            print(f"  ✓ [E] Pipeline E loaded from {_ckpt_dir} (device: {PIPELINE_E.device})")
         except Exception as _e:
             print(f"  ✗ [E] Could not load Pipeline E: {_e}")
         break
