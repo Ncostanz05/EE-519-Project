@@ -487,7 +487,9 @@ def analyze():
             [y_crop], sampling_rate=TARGET_SR, return_tensors="pt",
             padding="max_length", max_length=MAX_SAMPLES, truncation=True,
         )
-        input_values = encoded.input_values.to(DEVICE).requires_grad_(True)
+        # Use Pipeline E's own device (CPU on Mac — see inference.py for why).
+        pe_device = PIPELINE_E.device
+        input_values = encoded.input_values.to(pe_device).requires_grad_(True)
 
         PIPELINE_E.model.eval()
         out = PIPELINE_E.model(input_values)
@@ -511,7 +513,7 @@ def analyze():
         saliency = s_arr.tolist()
 
         with torch.no_grad():
-            out2 = PIPELINE_E.model(encoded.input_values.to(DEVICE))
+            out2 = PIPELINE_E.model(encoded.input_values.to(pe_device))
             if PIPELINE_E.calibrator is not None:
                 proba = PIPELINE_E.calibrator(out2["age_logits"])[0].cpu().float().tolist()
             else:
@@ -521,10 +523,11 @@ def analyze():
         # MC dropout uncertainty
         try:
             mc = PIPELINE_E.model.predict_with_mc_dropout(
-                encoded.input_values.to(DEVICE), n_samples=10
+                encoded.input_values.to(pe_device), n_samples=10
             )
             uncertainty = float(mc["uncertainty"][0].item())
-        except Exception:
+        except Exception as _e:
+            print(f"  MC dropout failed: {_e}")
             uncertainty = None
 
         return jsonify({
