@@ -197,8 +197,11 @@ function renderPipelineE(result, ageLabels) {
   predEl.classList.remove("empty");
   predEl.textContent = result.predicted_label;
 
-  // Gender sub-line
-  const gPct = (result.gender_proba * 100).toFixed(0);
+  // Gender sub-line — backend returns P(female) as gender_proba,
+  // so flip it when the prediction is male to show confidence in the chosen class.
+  const pFemale = result.gender_proba;
+  const pPredicted = result.gender_pred === 1 ? pFemale : 1 - pFemale;
+  const gPct = (pPredicted * 100).toFixed(0);
   genderEl.textContent = `${result.gender_label} (${gPct}% confidence)`;
 
   // Uncertainty badge
