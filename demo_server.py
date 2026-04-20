@@ -446,13 +446,75 @@ def predict_file():
     return jsonify(result)
 
 
+def _analyze_waveform(y, sr):
+    """Core analysis: saliency + MC dropout + proba + embedding. Returns dict or raises."""
+    import torch
+    from shared.constants import MAX_SAMPLES, TARGET_SR
+
+    # Prep waveform tensor
+    if len(y) >= MAX_SAMPLES:
+        start = (len(y) - MAX_SAMPLES) // 2
+        y_crop = y[start: start + MAX_SAMPLES]
+    else:
+        y_crop = np.pad(y, (0, MAX_SAMPLES - len(y))).astype(np.float32)
+    y_crop = y_crop.astype(np.float32)
+
+    encoded = PIPELINE_E.feature_extractor(
+        [y_crop], sampling_rate=TARGET_SR, return_tensors="pt",
+        padding="max_length", max_length=MAX_SAMPLES, truncation=True,
+    )
+    # Use Pipeline E's own device (CPU on Mac — see inference.py for why).
+    pe_device = PIPELINE_E.device
+    input_values = encoded.input_values.to(pe_device).requires_grad_(True)
+
+    PIPELINE_E.model.eval()
+    out = PIPELINE_E.model(input_values)
+    age_logits = out["age_logits"]
+    top_class = age_logits.argmax(dim=-1).item()
+    score = age_logits[0, top_class]
+    score.backward()
+
+    # Pool gradient per 320-sample (20ms) frame for visualization
+    grad = input_values.grad[0].abs().cpu().numpy()   # (T,)
+    frame_size = 320
+    n_frames = len(grad) // frame_size
+    saliency = [
+        float(grad[i * frame_size: (i + 1) * frame_size].mean())
+        for i in range(n_frames)
+    ]
+    s_arr = np.array(saliency)
+    if s_arr.max() > 0:
+        s_arr = s_arr / s_arr.max()
+    saliency = s_arr.tolist()
+
+    with torch.no_grad():
+        out2 = PIPELINE_E.model(encoded.input_values.to(pe_device))
+        if PIPELINE_E.calibrator is not None:
+            proba = PIPELINE_E.calibrator(out2["age_logits"])[0].cpu().float().tolist()
+        else:
+            proba = torch.softmax(out2["age_logits"][0], dim=-1).cpu().float().tolist()
+        embedding = out2["embedding"][0].cpu().float().tolist()
+
+    try:
+        mc = PIPELINE_E.model.predict_with_mc_dropout(
+            encoded.input_values.to(pe_device), n_samples=10
+        )
+        uncertainty = float(mc["uncertainty"][0].item())
+    except Exception as _e:
+        print(f"  MC dropout failed: {_e}")
+        uncertainty = None
+
+    return {
+        "saliency": saliency,
+        "embedding_norm": float(np.linalg.norm(embedding)),
+        "age_proba": proba,
+        "uncertainty": uncertainty,
+    }
+
+
 @app.route("/api/analyze", methods=["POST"])
 def analyze():
-    """
-    Deep analysis for Pipeline E: gradient saliency + embedding.
-    Returns saliency (one value per 320-sample frame), embedding (1024 floats),
-    age_proba (7 floats), uncertainty (float).
-    """
+    """Analysis for a live-recorded blob uploaded via multipart form."""
     if PIPELINE_E is None:
         return jsonify({"error": "Pipeline E not loaded"}), 503
 
@@ -472,70 +534,33 @@ def analyze():
     os.unlink(tmp_path)
 
     try:
-        import torch
-        from shared.constants import MAX_SAMPLES, TARGET_SR
+        return jsonify(_analyze_waveform(y, sr))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
-        # Prep waveform tensor
-        if len(y) >= MAX_SAMPLES:
-            start = (len(y) - MAX_SAMPLES) // 2
-            y_crop = y[start: start + MAX_SAMPLES]
-        else:
-            y_crop = np.pad(y, (0, MAX_SAMPLES - len(y))).astype(np.float32)
-        y_crop = y_crop.astype(np.float32)
 
-        encoded = PIPELINE_E.feature_extractor(
-            [y_crop], sampling_rate=TARGET_SR, return_tensors="pt",
-            padding="max_length", max_length=MAX_SAMPLES, truncation=True,
-        )
-        # Use Pipeline E's own device (CPU on Mac — see inference.py for why).
-        pe_device = PIPELINE_E.device
-        input_values = encoded.input_values.to(pe_device).requires_grad_(True)
+@app.route("/api/analyze_file", methods=["POST"])
+def analyze_file():
+    """Analysis for a dataset sample selected by path."""
+    if PIPELINE_E is None:
+        return jsonify({"error": "Pipeline E not loaded"}), 503
 
-        PIPELINE_E.model.eval()
-        out = PIPELINE_E.model(input_values)
-        age_logits = out["age_logits"]
-        top_class = age_logits.argmax(dim=-1).item()
-        score = age_logits[0, top_class]
-        score.backward()
+    data = request.get_json()
+    if not data or "path" not in data:
+        return jsonify({"error": "Missing 'path' in request body"}), 400
 
-        # Pool gradient per 320-sample (20ms) frame for visualization
-        grad = input_values.grad[0].abs().cpu().numpy()   # (T,)
-        frame_size = 320
-        n_frames = len(grad) // frame_size
-        saliency = [
-            float(grad[i * frame_size: (i + 1) * frame_size].mean())
-            for i in range(n_frames)
-        ]
-        # Normalize to [0, 1]
-        s_arr = np.array(saliency)
-        if s_arr.max() > 0:
-            s_arr = s_arr / s_arr.max()
-        saliency = s_arr.tolist()
+    filename = os.path.basename(data["path"])
+    file_path = os.path.join(AUDIO_DIR, filename)
+    if not os.path.exists(file_path):
+        return jsonify({"error": f"File not found: {filename}"}), 404
 
-        with torch.no_grad():
-            out2 = PIPELINE_E.model(encoded.input_values.to(pe_device))
-            if PIPELINE_E.calibrator is not None:
-                proba = PIPELINE_E.calibrator(out2["age_logits"])[0].cpu().float().tolist()
-            else:
-                proba = torch.softmax(out2["age_logits"][0], dim=-1).cpu().float().tolist()
-            embedding = out2["embedding"][0].cpu().float().tolist()
+    try:
+        y, sr = librosa.load(file_path, sr=16000, mono=True)
+    except Exception as e:
+        return jsonify({"error": f"Could not read audio: {e}"}), 400
 
-        # MC dropout uncertainty
-        try:
-            mc = PIPELINE_E.model.predict_with_mc_dropout(
-                encoded.input_values.to(pe_device), n_samples=10
-            )
-            uncertainty = float(mc["uncertainty"][0].item())
-        except Exception as _e:
-            print(f"  MC dropout failed: {_e}")
-            uncertainty = None
-
-        return jsonify({
-            "saliency": saliency,
-            "embedding_norm": float(np.linalg.norm(embedding)),
-            "age_proba": proba,
-            "uncertainty": uncertainty,
-        })
+    try:
+        return jsonify(_analyze_waveform(y, sr))
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

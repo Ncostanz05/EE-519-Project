@@ -10,7 +10,8 @@ const trueLabels = document.getElementById("trueLabels");
 
 let mediaRecorder = null;
 let chunks = [];
-let lastBlob = null;   // retained for /api/analyze
+let lastBlob = null;        // retained for /api/analyze (live recording)
+let lastSamplePath = null;  // retained for /api/analyze_file (dataset sample)
 
 // ── Recording ──────────────────────────────────────────────────────
 recordBtn.addEventListener("click", async () => {
@@ -32,6 +33,7 @@ recordBtn.addEventListener("click", async () => {
       }
       const blob = new Blob(chunks, { type: mediaRecorder.mimeType || "audio/webm" });
       lastBlob = blob;
+      lastSamplePath = null;
       recPlayback.hidden = true;
       recPlayback.src = "";
       trueLabels.hidden = true;
@@ -101,6 +103,7 @@ async function selectSample(el, sample) {
   document.querySelectorAll(".sample.active").forEach((n) => n.classList.remove("active"));
   el.classList.add("active");
   lastBlob = null;
+  lastSamplePath = sample.path;
 
   recPlayback.src = `/api/audio/${encodeURIComponent(sample.path)}`;
   recPlayback.hidden = false;
@@ -241,27 +244,46 @@ function renderPipelineE(result, ageLabels) {
     })
     .join("");
 
-  // Analysis button — only show when we have a live recording blob
-  if (lastBlob) {
+  // Analysis button — show for live recordings or selected samples
+  if (lastBlob || lastSamplePath) {
     analysisBtn.hidden = false;
-    analysisBtn.onclick = () => fetchAnalysis(lastBlob);
+    analysisBtn.onclick = () => fetchAnalysis();
   } else {
     analysisBtn.hidden = true;
   }
 }
 
 // ── Analysis (saliency) ────────────────────────────────────────────
-async function fetchAnalysis(blob) {
+async function fetchAnalysis() {
   const panel = document.getElementById("analysisPanel");
   const btn = document.getElementById("analysisToggle");
   btn.disabled = true;
   btn.textContent = "⚡ Analyzing…";
   panel.hidden = false;
 
-  const fd = new FormData();
-  fd.append("audio", blob, "recording.webm");
+  // Route to the right endpoint based on input source
+  let fetchOpts;
+  if (lastBlob) {
+    const fd = new FormData();
+    fd.append("audio", lastBlob, "recording.webm");
+    fetchOpts = { url: "/api/analyze", init: { method: "POST", body: fd } };
+  } else if (lastSamplePath) {
+    fetchOpts = {
+      url: "/api/analyze_file",
+      init: {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path: lastSamplePath }),
+      },
+    };
+  } else {
+    btn.disabled = false;
+    btn.textContent = "⚡ Analysis";
+    return;
+  }
+
   try {
-    const res = await fetch("/api/analyze", { method: "POST", body: fd });
+    const res = await fetch(fetchOpts.url, fetchOpts.init);
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Analysis failed");
     drawSaliency(data.saliency);
